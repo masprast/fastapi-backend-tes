@@ -1,3 +1,9 @@
+### Git ###
+.gitignore
+
+### Docker ###
+docker/
+
 ### VisualStudioCode ###
 .vscode/*
 !.vscode/settings.json
