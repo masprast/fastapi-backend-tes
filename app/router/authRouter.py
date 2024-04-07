@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 import os
 import smtplib
+import ssl
 from typing import Annotated
 from uuid import UUID
 from dotenv import load_dotenv
@@ -146,14 +147,16 @@ def kirimEmail(token: str, email: str):
     pesan.attach(MIMEText(body_email, "html"))
 
     try:
+        context = ssl.create_default_context()
         mailserver = smtplib.SMTP("smtp.gmail.com", 587)
-        mailserver.starttls()
+        mailserver.starttls(context=context)
         mailserver.login(from_email, pass_email)
         mailserver.sendmail(from_email, email, pesan.as_string())
-        mailserver.quit()
         return {"pesan": "email verifikasi berhasil dikirim"}
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="tidak dapat mengirim email ke {email} \n {e}",
+            detail=f"""tidak dapat mengirim email ke {email} | error: {e}""",
         )
+    finally:
+        mailserver.quit()
