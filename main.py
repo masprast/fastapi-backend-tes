@@ -1,25 +1,28 @@
 import os
 from typing import Annotated
 from dotenv import load_dotenv
-from fastapi import FastAPI,HTTPException,Depends
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi_sqlalchemy import DBSessionMiddleware
 from sqlalchemy.orm import Session
 from base.userbase import UserBase
 
 from db.initdb import InitDB
-from router.userRouter import router
+from router import authRouter, userRouter
 
-load_dotenv('local.env')
+load_dotenv("local.env")
 
 app = FastAPI()
-app.include_router(router)
+app.include_router(authRouter.router)
+app.include_router(userRouter.router)
 
 InitDB()
 # db_dependency = Annotated(Session,Depends(get_db))
 
+
 @app.get("/")
 async def root():
     return {"message": "Assalamualaikum"}
+
 
 # @app.post('/add_user')
 # async def tambah_user(user:UserBase,db:db_dependency):
