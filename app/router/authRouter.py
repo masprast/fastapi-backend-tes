@@ -10,14 +10,14 @@ from sqlalchemy.orm import Session
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
-from base.authBase import AuthBase, AuthOutput
-from base.tokenBase import Token, TokenData, TokenModelBase
-from base.userbase import UserBase
-from db.db import get_db
-from model.tokenModel import TokenModel
-from model.userModel import UserModel
-from service import tokenService, userService
-from service.authService import (
+from app.base.authBase import AuthBase, AuthOutput
+from app.base.tokenBase import Token, TokenData, TokenModelBase
+from app.base.userbase import UserBase
+from app.db.db import get_db
+from app.model.tokenModel import TokenModel
+from app.model.userModel import UserModel
+from app.service import tokenService, userService
+from app.service.authService import (
     createAccessToken,
     createRefreshToken,
     hashing,
@@ -48,12 +48,16 @@ async def registerUser(user: AuthBase, session: Annotated[Session, Depends(get_d
     # return {
     #     "pesan": f"user {buatUser.username} dengan email {buatUser.email} berhasil registrasi"
     # }
-    token = TokenData(email=buatUser.email, id=buatUser.id, is_super=buatUser.is_super)
-    print(token.model_dump())
-    access_token = createAccessToken(**token.model_dump())
-    kirimEmail(access_token)
+    token = TokenData(
+        email=buatUser.email, id=buatUser.id, is_super=buatUser.is_super
+    ).model_dump()
+    token.update({"id": str(token.get("id"))})
+    access_token = createAccessToken(token)
+    print(buatUser.email)
+    kirimEmail(access_token, buatUser.email)
+
     return AuthOutput(
-        id=buatUser.id,
+        id=token.get("id"),
         email=buatUser.email,
         created_at=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
     )
@@ -63,7 +67,6 @@ async def registerUser(user: AuthBase, session: Annotated[Session, Depends(get_d
 async def loginUser(
     user: Annotated[AuthBase, Depends()], session: Annotated[Session, Depends(get_db)]
 ):
-    # email = emailValidator(user.email)
     adauser = await userService.getUserByEmail(user.email, session)
     if adauser is None:
         raise HTTPException(
@@ -87,6 +90,7 @@ async def loginUser(
         userId=adauser.id, access_token=access_token, refresh_token=refresh_token
     )
     getteduser = await getUser(access_token, session)
+    getteduser.model_dump()
     # await tokenService.addToken(
     #     TokenModel(**tokenModel.model_dump(exclude_unset=True)), session
     # )
@@ -151,5 +155,5 @@ def kirimEmail(token: str, email: str):
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="tidak dapat mengirim email ke {email}",
+            detail="tidak dapat mengirim email ke {email} \n {e}",
         )

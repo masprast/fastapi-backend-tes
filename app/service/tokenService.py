@@ -1,6 +1,7 @@
 from uuid import UUID
-from model.tokenModel import TokenModel
 from sqlalchemy.orm import Session
+
+from app.model.tokenModel import TokenModel
 
 
 async def addToken(token: TokenModel, db: Session):

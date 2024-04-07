@@ -1,6 +1,6 @@
 ### Troubleshooting
 
-1. Jika muncul _warning_ :
+1. Jika muncul _warning_ saat melakukan pengetesan:
    > ```sh
    > (trapped) error reading bcrypt version
    > Traceback (most recent call last):

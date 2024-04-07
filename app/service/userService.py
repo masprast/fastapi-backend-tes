@@ -1,7 +1,7 @@
 from uuid import UUID, uuid4
 from sqlalchemy.orm import Session
 
-from model.userModel import UserModel
+from app.model.userModel import UserModel
 
 
 async def getAllUser(db: Session):

@@ -3,10 +3,10 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from base.userbase import UserBase, UserInDB
-from model.userModel import UserModel
-from service import userService
-from db.db import get_db
+from app.base.userbase import UserBase, UserInDB
+from app.model.userModel import UserModel
+from app.service import userService
+from app.db.db import get_db
 
 router = APIRouter(prefix="/users", tags=["User"])
 

@@ -1,5 +1,5 @@
 from sqlalchemy import TIMESTAMP, UUID, Boolean, Column, DateTime, String, func
-from db.db import Base
+from app.db.db import Base
 
 
 class UserModel(Base):

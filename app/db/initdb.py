@@ -4,9 +4,9 @@ from dotenv import load_dotenv
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy_utils import database_exists, create_database
 
-from model.userModel import UserModel
-from db.db import engine, Base
-from service.authService import hashing
+from app.model.userModel import UserModel
+from app.db.db import engine, Base
+from app.service.authService import hashing
 
 load_dotenv("local.env")
 

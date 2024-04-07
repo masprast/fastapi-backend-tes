@@ -1,5 +1,5 @@
 from sqlalchemy import UUID, Column, String
-from db.db import Base
+from app.db.db import Base
 
 
 class TokenModel(Base):

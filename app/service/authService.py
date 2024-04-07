@@ -7,7 +7,7 @@ from passlib.context import CryptContext
 from jose import JWTError, jwt
 from pydantic import ValidationError
 
-from base.tokenBase import TokenPayload
+from app.base.tokenBase import TokenPayload
 
 load_dotenv("secret.env")
 
@@ -35,7 +35,7 @@ def createAccessToken(data: dict, exp: timedelta | None = None):
         exp = datetime.now(timezone.utc) + exp
     else:
         exp = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXP_MIN)
-    print(exp)
+
     # to_encode.update({"exp": datetime(exp).strftime("%Y-%m-%d %H:%M:%S")})
     to_encode.update({"exp": exp})
     return jwt.encode(to_encode, JWT_SECRET, algorithm=ALGORITHM)
@@ -58,7 +58,7 @@ def verifyToken(token: str):
         # data = payload.get("sub")
         data = TokenPayload(**payload)
         print("data: ", data)
-        if datetime.fromtimestamp(data.exp) < datetime.now():
+        if datetime.fromtimestamp(data.exp) > datetime.now():
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="token expired",
