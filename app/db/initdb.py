@@ -27,7 +27,8 @@ class InitDB:
             .values(
                 id=str(uuid4().hex),
                 username="super",
-                password=hashing("user"),
+                password=hashing("superuser"),
+                email="super@super.su",
                 is_super=True,
             )
             .on_conflict_do_nothing(index_elements=[UserModel.username])

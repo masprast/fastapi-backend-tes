@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.base.authBase import AuthBase, AuthOutput
 from app.base.tokenBase import Token, TokenData
-from app.base.userbase import UserBase
+from app.base.userbase import UserBase, UserInDB
 from app.db.db import get_db
 from app.model.userModel import UserModel
 from app.router.jwtBearer import JWTBearer
@@ -40,19 +40,19 @@ def getUser(
     "/register", status_code=status.HTTP_201_CREATED, response_model=AuthOutput
 )
 async def registerUser(user: AuthBase, session: Annotated[Session, Depends(get_db)]):
-    adaUser = userService.getUserByUsername(user.username, session)
+    adaUser = userService.getUserByEmail(user.email, session)
     if adaUser:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail="user sudah ada"
         )
 
-    userBaru = AuthBase(password=hashing(user.password), username=user.username)
+    userBaru = AuthBase(password=hashing(user.password), email=user.email)
     buatUser = userService.addUser(UserModel(**userBaru.model_dump()), session)
     # return {
     #     "pesan": f"user {buatUser.username} dengan email {buatUser.email} berhasil registrasi"
     # }
     token = TokenData(
-        username=buatUser.username, id=buatUser.id, is_super=buatUser.is_super
+        email=buatUser.email, id=buatUser.id, is_super=buatUser.is_super
     ).model_dump()
     token.update({"id": str(token.get("id"))})
     access_token = createAccessToken(token)
@@ -61,7 +61,8 @@ async def registerUser(user: AuthBase, session: Annotated[Session, Depends(get_d
 
     return AuthOutput(
         id=token.get("id"),
-        username=buatUser.username,
+        email=buatUser.email,
+        accessToken=access_token,
         created_at=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
     )
 
@@ -116,19 +117,17 @@ async def registerUser(user: AuthBase, session: Annotated[Session, Depends(get_d
 #     return Token(accessToken=access_token, refreshToken=refresh_token).model_dump()
 @router.post("/login")
 async def login(
-    form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
+    form_data: Annotated[AuthBase, Depends()],
     session: Annotated[Session, Depends(get_db)],
 ):
-    cekUser = authService.authenticateUser(
-        form_data.username, form_data.password, session
-    )
+    cekUser = authService.authenticateUser(form_data.email, form_data.password, session)
     if not cekUser:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="invalid credential"
         )
 
     dataToken = TokenData(
-        id=cekUser.id, username=cekUser.username, is_super=cekUser.is_super
+        id=cekUser.id, email=cekUser.email, is_super=cekUser.is_super
     ).model_dump()
     dataToken.update({"id": str(dataToken.get("id"))})
     accessToken = createAccessToken(dataToken)
@@ -136,6 +135,6 @@ async def login(
     return Token(accessToken=accessToken, refreshToken=refreshToken).model_dump()
 
 
-@router.get("/me", response_model=UserBase, dependencies=[Depends(JWTBearer())])
+@router.get("/me", response_model=UserInDB, dependencies=[Depends(JWTBearer())])
 async def aboutMe(me: Annotated[UserBase, Depends(getUser)]):
     return me

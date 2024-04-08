@@ -1,6 +1,6 @@
 from typing import Optional
 from uuid import UUID
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 
 
 class Token(BaseModel):
@@ -17,7 +17,7 @@ class TokenModelBase(BaseModel):
 class TokenData(BaseModel):
     # id: Optional[UUID] = None
     id: UUID
-    username: str
+    email: EmailStr
     is_super: bool
 
 

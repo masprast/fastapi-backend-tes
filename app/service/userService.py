@@ -35,7 +35,7 @@ def getUserByEmail(email: str, db: Session):
 
 
 def addUser(user: UserModel, db: Session):
-    user.id = uuid4().hex
+    user.id = uuid4().hex.replace("-", "")
     db.add(user)
     db.commit()
     db.refresh(user)

@@ -5,7 +5,6 @@ import os
 from datetime import datetime, timedelta, timezone
 import smtplib
 import ssl
-from typing import Any
 from uuid import UUID
 from dotenv import load_dotenv
 from fastapi import HTTPException, status
@@ -29,7 +28,6 @@ JWT_REFRESH_SECRET = os.environ["JWT_REFRESH_SECRET"]
 enkriptor = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login", scheme_name="JWT")
-oauth2_scheme_user = OAuth2PasswordBearer(tokenUrl="users/", scheme_name="JWT")
 
 
 def hashing(password: str):
@@ -40,12 +38,8 @@ def verifying(password: str, hashed: str):
     return enkriptor.verify(password, hashed)
 
 
-# def userAuthentication(password: str, user: UserModel):
-#     if not verifying(password, user.password):
-#         return False
-#     return True
-def authenticateUser(username: str, password: str, sesion):
-    adaUser = userService.getUserByUsername(username, sesion)
+def authenticateUser(email: str, password: str, sesion):
+    adaUser = userService.getUserByEmail(email, sesion)
     if adaUser:
         isVerified = verifying(password, adaUser.password)
 
@@ -53,6 +47,13 @@ def authenticateUser(username: str, password: str, sesion):
         return False
 
     return adaUser
+
+
+def authHeder(token: str):
+    authorized = JWTdecode(token)
+    if authorized is None:
+        return {}
+    return authorized
 
 
 def signJWT(payload: TokenPayload):
@@ -132,7 +133,7 @@ def getCurrentUser(token: str, sesion):
             )
         tokenData = TokenData(
             id=data.get("id"),
-            username=data.get("username"),
+            email=data.get("email"),
             is_super=data.get("is_super"),
         )
     except JWTError:
@@ -149,12 +150,13 @@ def getCurrentUser(token: str, sesion):
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    return UserBase(
+    return UserInDB(
         username=currentUser.username,
         full_name=currentUser.full_name,
         email=currentUser.email,
         is_super=currentUser.is_super,
         last_login=currentUser.last_login,
+        password=currentUser.password,
     )
 
 

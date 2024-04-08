@@ -2,7 +2,7 @@ import json
 from typing import Annotated, List
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
 from app.base.tokenBase import TokenData
@@ -12,7 +12,7 @@ from app.router.jwtBearer import JWTBearer
 from app.service import userService
 from app.db.db import get_db
 from app.service import authService
-from app.service.authService import JWTdecode, oauth2_scheme_user
+from app.service.authService import JWTdecode, oauth2_scheme
 
 router = APIRouter(prefix="/users", tags=["User"])
 
@@ -26,16 +26,21 @@ async def cek_super(token: str, db=Session):
     return False
 
 
-@router.get("/", summary="hanya super user yang dapat melakukan CRUD operation")
+@router.get(
+    "/",
+    summary="hanya super user yang dapat melakukan CRUD operation",
+    dependencies=[Depends(JWTBearer())],
+)
 async def getAllUser(
-    token: Annotated[str, Depends(oauth2_scheme_user)],
+    # token: Annotated[str, Depends(oauth2_scheme)],
     db: Annotated[Session, Depends(get_db)],
 ):
-    print(token)
-    data = authService.JWTdecode(token)
+    # data = authService.JWTdecode(token)
     # tokendata = TokenData(
     #     id=data.get("id"), username=data.get("username"), is_super=data.get("is_super")
     # )
+    # is_super = authService.JWTdecode(data)
+    # print(data)
     users = userService.getAllUser(db)
     listUser = list()
     for u in users:
@@ -56,14 +61,18 @@ async def getAllUser(
 
 
 @router.post(
-    "/tambah", status_code=status.HTTP_201_CREATED, response_model=List[UserBase]
+    "/tambah",
+    status_code=status.HTTP_201_CREATED,
+    response_model=List[UserBase],
+    dependencies=[Depends(JWTBearer())],
 )
 async def tambahUser(
     user: UserInDB,
-    token: Annotated[str, Depends(oauth2_scheme_user)],
+    # token: Annotated[str, Depends(oauth2_scheme)],
     db: Session = Depends(get_db),
 ):
-    ada = userService.getUserByUsername(user.username, db)
+    # ada = userService.getUserByUsername(user.username, db, db)
+    ada = userService.getDetilUser()
     if ada:
         pesan = ""
         if ada.username == user.username and ada.email == user.email:
@@ -85,9 +94,13 @@ async def tambahUser(
     return [userBaru]
 
 
-@router.get("/{username}", status_code=status.HTTP_200_OK, response_model=UserBase)
-async def detilUser(username: str, db: Session = Depends(get_db)):
-    detil = userService.getUserByUsername(username, db)
+@router.get(
+    "/{id}",
+    status_code=status.HTTP_200_OK,
+    response_model=UserBase,
+)
+async def detilUser(id: str, db: Session = Depends(get_db)):
+    detil = userService.getDetilUser(UUID(id), db)
     if detil is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -99,7 +112,7 @@ async def detilUser(username: str, db: Session = Depends(get_db)):
 @router.delete("/hapus/{id}", status_code=status.HTTP_204_NO_CONTENT)
 async def hapusUser(
     id: str,
-    token: Annotated[str, Depends(oauth2_scheme_user)],
+    token: Annotated[str, Depends(oauth2_scheme)],
     db: Session = Depends(get_db),
 ):
     hapus = userService.getDetilUser(id, db)
@@ -116,7 +129,7 @@ async def hapusUser(
 async def ubahUser(
     data: UserBase,
     id: str,
-    token: Annotated[str, Depends(oauth2_scheme_user)],
+    token: Annotated[str, Depends(oauth2_scheme)],
     db: Session = Depends(get_db),
 ):
     ada = userService.getDetilUser(id, db)

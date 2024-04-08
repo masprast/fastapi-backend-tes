@@ -1,11 +1,12 @@
 import datetime
+import email
 from uuid import UUID
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field
 
 
 class AuthBase(BaseModel):
-    # email: EmailStr = Field(..., description="email")
-    username: str = Field(..., description="username")
+    email: EmailStr = Field(..., description="email")
+    # username: str = Field(..., description="username")
     password: str = Field(..., description="password", min_length=8)
 
     # @validator("email")
@@ -17,8 +18,9 @@ class AuthBase(BaseModel):
 
 
 class AuthOutput(BaseModel):
-    username: str
     id: UUID
+    email: EmailStr
+    accessToken: str
     created_at: datetime.datetime
 
     class Config:
