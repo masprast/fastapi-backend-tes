@@ -88,6 +88,8 @@ Tidak lama akan muncul `INFO:     Application startup complete.` sebagai tanda *
 Untuk melakukan pengetesan pada backend, jalankan web browser dan buka alamat `localhost:8000/docs` kemudian dapat dilihat pada video di bawah ini.
 
 [video.webm](https://github.com/masprast/fastapi-backend-tes/assets/79097664/0f245950-6ede-457a-8de2-4213fed32a2f)
+[video.webm](https://github.com/masprast/fastapi-backend-tes/assets/79097664/38a13442-482f-4958-b1a5-377232410473)
+
 
 > Informasi _login_ untuk `superuser` : `{"email": "super@super.su", "password": "superuser"}`
 
