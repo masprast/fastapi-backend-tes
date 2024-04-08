@@ -15,5 +15,4 @@ class UserBase(BaseModel):
 
 
 class UserInDB(UserBase):
-    id: UUID
-    hashed: str
+    password: str

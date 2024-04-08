@@ -29,6 +29,7 @@ JWT_REFRESH_SECRET = os.environ["JWT_REFRESH_SECRET"]
 enkriptor = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login", scheme_name="JWT")
+oauth2_scheme_user = OAuth2PasswordBearer(tokenUrl="users/", scheme_name="JWT")
 
 
 def hashing(password: str):
@@ -67,7 +68,7 @@ def JWTdecode(token: str):
         # raise HTTPException(
         #     status_code=status.HTTP_401_UNAUTHORIZED, detail="token tidak valid"
         # )
-        return dict()
+        return {}
 
 
 def createAccessToken(data: dict, exp: timedelta | None = None):
@@ -121,15 +122,19 @@ def verifyToken(token: str):
 def getCurrentUser(token: str, sesion):
     try:
         payload = JWTdecode(token)
-        data = payload.get("sub")
-        print(token)
+        data = {**json.loads(payload.get("sub"))}
+
         if data is None:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="credential tidak valid",
                 headers={"WWW-Authenticate": "Bearer"},
             )
-        tokenData = TokenData(data)
+        tokenData = TokenData(
+            id=data.get("id"),
+            username=data.get("username"),
+            is_super=data.get("is_super"),
+        )
     except JWTError:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

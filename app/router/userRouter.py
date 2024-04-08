@@ -8,10 +8,11 @@ from sqlalchemy.orm import Session
 from app.base.tokenBase import TokenData
 from app.base.userbase import UserBase, UserInDB
 from app.model.userModel import UserModel
+from app.router.jwtBearer import JWTBearer
 from app.service import userService
 from app.db.db import get_db
 from app.service import authService
-from app.service.authService import JWTdecode, oauth2_scheme
+from app.service.authService import JWTdecode, oauth2_scheme_user
 
 router = APIRouter(prefix="/users", tags=["User"])
 
@@ -27,12 +28,16 @@ async def cek_super(token: str, db=Session):
 
 @router.get("/", summary="hanya super user yang dapat melakukan CRUD operation")
 async def getAllUser(
-    token: Annotated[str, Depends(oauth2_scheme)],
+    token: Annotated[str, Depends(oauth2_scheme_user)],
     db: Annotated[Session, Depends(get_db)],
 ):
-    tokendata = TokenData(**json.loads(authService.JWTdecode(token).sub))
+    print(token)
+    data = authService.JWTdecode(token)
+    # tokendata = TokenData(
+    #     id=data.get("id"), username=data.get("username"), is_super=data.get("is_super")
+    # )
     users = userService.getAllUser(db)
-    listUser = List[UserBase]
+    listUser = list()
     for u in users:
         listUser.append(
             UserBase(
@@ -43,10 +48,11 @@ async def getAllUser(
             )
         )
 
-    if tokendata.is_super:
-        return users
-    else:
-        return listUser
+    # if tokendata.is_super:
+    #     return users
+    # else:
+    #     return listUser
+    return users
 
 
 @router.post(
@@ -54,10 +60,10 @@ async def getAllUser(
 )
 async def tambahUser(
     user: UserInDB,
-    token: Annotated[str, Depends(oauth2_scheme)],
+    token: Annotated[str, Depends(oauth2_scheme_user)],
     db: Session = Depends(get_db),
 ):
-    ada = userService.getUserByEmail(user.email, db)
+    ada = userService.getUserByUsername(user.username, db)
     if ada:
         pesan = ""
         if ada.username == user.username and ada.email == user.email:
@@ -72,10 +78,10 @@ async def tambahUser(
             detail=f"{pesan} sudah ada",
         )
 
-    data_dump = user.model_dump()
-    model = UserModel(data_dump)
-    model.password = data_dump.get("hashed")
-    userBaru = await userService.addUser(model, db)
+    passHash = authService.hashing(user.password)
+    user.password = passHash
+    model = UserModel(**user.model_dump())
+    userBaru = userService.addUser(model, db)
     return [userBaru]
 
 
@@ -93,36 +99,36 @@ async def detilUser(id: str, db: Session = Depends(get_db)):
 @router.delete("/hapus/{id}", status_code=status.HTTP_204_NO_CONTENT)
 async def hapusUser(
     id: str,
-    token: Annotated[str, Depends(oauth2_scheme)],
+    token: Annotated[str, Depends(oauth2_scheme_user)],
     db: Session = Depends(get_db),
 ):
     hapus = userService.getDetilUser(id, db)
-    if hapus.first() is None:
+    if hapus is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"tidak ada user dengan id: {id} untuk dihapus",
         )
 
-    await userService.deleteUser(id, db)
+    userService.deleteUser(id, db)
 
 
 @router.patch("/ubah/{id}", status_code=status.HTTP_200_OK, response_model=UserBase)
 async def ubahUser(
     data: UserBase,
     id: str,
-    token: Annotated[str, Depends(oauth2_scheme)],
+    token: Annotated[str, Depends(oauth2_scheme_user)],
     db: Session = Depends(get_db),
 ):
     ada = userService.getDetilUser(id, db)
-    if ada.first() is None:
+    if ada is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"tidak ada user dengan id: {id} untuk diubah",
         )
 
     data_dump = data.model_dump(exclude_unset=True)
-    model = UserModel(data_dump)
+    model = UserModel(**data_dump)
     print(model)
     model.password = data_dump.get("hashed")
-    perubahan = await userService.patchUser(data_dump, id, db)
+    perubahan = userService.patchUser(data_dump, id, db)
     return perubahan

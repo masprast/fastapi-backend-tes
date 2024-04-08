@@ -6,11 +6,11 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
 from app.base.authBase import AuthBase, AuthOutput
-from app.base.tokenBase import Token, TokenData, TokenModelBase
+from app.base.tokenBase import Token, TokenData
 from app.base.userbase import UserBase
 from app.db.db import get_db
-from app.model.tokenModel import TokenModel
 from app.model.userModel import UserModel
+from app.router.jwtBearer import JWTBearer
 from app.service import tokenService, userService
 from app.service import authService
 from app.service.authService import (
@@ -18,7 +18,6 @@ from app.service.authService import (
     createRefreshToken,
     hashing,
     kirimEmail,
-    verifying,
     oauth2_scheme,
 )
 
@@ -31,7 +30,7 @@ def getUser(
     token: Annotated[str, Depends(oauth2_scheme)],
     sesion: Annotated[Session, Depends(get_db)],
 ):
-    print(token)
+    print("token", token)
     user = authService.getCurrentUser(token, sesion)
     currentUser = authService.userAktif(user)
     return currentUser
@@ -137,6 +136,6 @@ async def login(
     return Token(accessToken=accessToken, refreshToken=refreshToken).model_dump()
 
 
-@router.get("/me", response_model=UserBase)
+@router.get("/me", response_model=UserBase, dependencies=[Depends(JWTBearer())])
 async def aboutMe(me: Annotated[UserBase, Depends(getUser)]):
     return me
