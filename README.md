@@ -88,6 +88,7 @@ Tidak lama akan muncul `INFO:     Application startup complete.` sebagai tanda *
 Untuk melakukan pengetesan pada backend, jalankan web browser dan buka alamat `localhost:8000/docs` kemudian dapat dilihat pada video di bawah ini.
 
 ![video](video.webm)
+file:///home/pras/Unduhan/video.webm
 
 > Informasi _login_ untuk `superuser` : `{"email": "super@super.su", "password": "superuser"}`
 
