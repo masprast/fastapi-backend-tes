@@ -39,14 +39,17 @@ def getUser(
 @router.post(
     "/register", status_code=status.HTTP_201_CREATED, response_model=AuthOutput
 )
-async def registerUser(user: AuthBase, session: Annotated[Session, Depends(get_db)]):
-    adaUser = userService.getUserByEmail(user.email, session)
+async def registerUser(
+    user: Annotated[OAuth2PasswordRequestForm, Depends()],
+    session: Annotated[Session, Depends(get_db)],
+):
+    adaUser = userService.getUserByEmail(user.username, session)
     if adaUser:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail="user sudah ada"
         )
 
-    userBaru = AuthBase(password=hashing(user.password), email=user.email)
+    userBaru = AuthBase(password=hashing(user.password), email=user.username)
     buatUser = userService.addUser(UserModel(**userBaru.model_dump()), session)
     # return {
     #     "pesan": f"user {buatUser.username} dengan email {buatUser.email} berhasil registrasi"
@@ -121,7 +124,7 @@ async def login(
     session: Annotated[Session, Depends(get_db)],
 ):
     cekUser = authService.authenticateUser(
-        form_data.username, form_data.password, session
+        email=form_data.username, password=form_data.password, sesion=session
     )
     if not cekUser:
         raise HTTPException(

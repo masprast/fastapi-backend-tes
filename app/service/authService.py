@@ -40,6 +40,7 @@ def verifying(password: str, hashed: str):
 
 def authenticateUser(email: str, password: str, sesion):
     adaUser = userService.getUserByEmail(email, sesion)
+    print(adaUser)
     if adaUser:
         isVerified = verifying(password, adaUser.password)
 

@@ -17,9 +17,9 @@ from app.service.authService import JWTdecode, oauth2_scheme
 router = APIRouter(prefix="/users", tags=["User"])
 
 
-async def cek_super(token: str, db=Session):
+def cek_super(token: Annotated[str, Depends(oauth2_scheme)], db=Session):
     tokendata = json.loads(JWTdecode(token).sub)
-    user = await userService.getDetilUser(TokenData(**tokendata), db)
+    user = userService.getDetilUser(TokenData(**tokendata), db)
     if user.is_super:
         return True
 
@@ -32,7 +32,7 @@ async def cek_super(token: str, db=Session):
     dependencies=[Depends(JWTBearer())],
 )
 async def getAllUser(
-    token: Annotated[str, Depends(oauth2_scheme)],
+    token: Annotated[str, Depends(cek_super)],
     db: Annotated[Session, Depends(get_db)],
 ):
     # data = authService.JWTdecode(token)
