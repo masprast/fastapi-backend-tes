@@ -114,4 +114,3 @@ Untuk melakukan pengetesan pada backend, jalankan web browser dan buka alamat `l
 
 - Masih belum bisa mengirim _email_ verifikasi ke alamat _email user_
 - Tidak ada _error_ saat mengunggah _file_ atau pun memuat _file_, tetapi _file_ yang diunggah tidak dapat ditampilkan
-- Superuser untuk CRUD tidak dapat login (padahal tadi siang berhasil, tiba-tiba malam _errar-error_ terus)
