@@ -17,10 +17,11 @@ from app.service.authService import JWTdecode, oauth2_scheme
 router = APIRouter(prefix="/users", tags=["User"])
 
 
-def cek_super(token: Annotated[str, Depends(oauth2_scheme)], db=Session):
-    tokendata = json.loads(JWTdecode(token).sub)
-    user = userService.getDetilUser(TokenData(**tokendata), db)
-    if user.is_super:
+def cek_super(token: Annotated[str, Depends(oauth2_scheme)]):
+    tokendata = json.loads(JWTdecode(token).get("sub"))
+    print("data: ", tokendata.get("is_super"))
+    # user = userService.getDetilUser(TokenData(**tokendata), db)
+    if tokendata.get("is_super"):
         return True
 
     return False
@@ -32,15 +33,9 @@ def cek_super(token: Annotated[str, Depends(oauth2_scheme)], db=Session):
     dependencies=[Depends(JWTBearer())],
 )
 async def getAllUser(
-    token: Annotated[str, Depends(cek_super)],
+    super: Annotated[bool, Depends(cek_super)],
     db: Annotated[Session, Depends(get_db)],
 ):
-    # data = authService.JWTdecode(token)
-    # tokendata = TokenData(
-    #     id=data.get("id"), username=data.get("username"), is_super=data.get("is_super")
-    # )
-    # is_super = authService.JWTdecode(data)
-    # print(data)
     users = userService.getAllUser(db)
     listUser = list()
     for u in users:
@@ -53,11 +48,10 @@ async def getAllUser(
             )
         )
 
-    # if tokendata.is_super:
-    #     return users
-    # else:
-    #     return listUser
-    return users
+    if super:
+        return users
+    else:
+        return listUser
 
 
 @router.post(
@@ -68,10 +62,14 @@ async def getAllUser(
 )
 async def tambahUser(
     user: UserInDB,
-    # token: Annotated[str, Depends(oauth2_scheme)],
+    super: Annotated[bool, Depends(cek_super)],
     db: Session = Depends(get_db),
 ):
-    # ada = userService.getUserByUsername(user.username, db, db)
+    if not super:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="hanya superuser yang dapat melakukan CRUD operation",
+        )
     ada = userService.getUserByEmail(user.email, db)
     if ada:
         pesan = ""
@@ -94,12 +92,7 @@ async def tambahUser(
     return [userBaru]
 
 
-@router.get(
-    "/{id}",
-    status_code=status.HTTP_200_OK,
-    response_model=UserBase,
-    dependencies=[Depends(JWTBearer())],
-)
+@router.get("/{id}", status_code=status.HTTP_200_OK, response_model=UserBase)
 async def detilUser(id: str, db: Session = Depends(get_db)):
     detil = userService.getDetilUser(UUID(id), db)
     if detil is None:
@@ -117,9 +110,14 @@ async def detilUser(id: str, db: Session = Depends(get_db)):
 )
 async def hapusUser(
     id: str,
-    token: Annotated[str, Depends(oauth2_scheme)],
+    super: Annotated[bool, Depends(cek_super)],
     db: Session = Depends(get_db),
 ):
+    if not super:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="hanya superuser yang dapat melakukan CRUD operation",
+        )
     hapus = userService.getDetilUser(id, db)
     if hapus is None:
         raise HTTPException(
@@ -139,9 +137,14 @@ async def hapusUser(
 async def ubahUser(
     data: UserBase,
     id: str,
-    token: Annotated[str, Depends(oauth2_scheme)],
+    super: Annotated[bool, Depends(cek_super)],
     db: Session = Depends(get_db),
 ):
+    if not super:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="hanya superuser yang dapat melakukan CRUD operation",
+        )
     ada = userService.getDetilUser(id, db)
     if ada is None:
         raise HTTPException(
@@ -151,7 +154,6 @@ async def ubahUser(
 
     data_dump = data.model_dump(exclude_unset=True)
     model = UserModel(**data_dump)
-    print(model)
     model.password = data_dump.get("hashed")
     perubahan = userService.patchUser(data_dump, id, db)
     return perubahan

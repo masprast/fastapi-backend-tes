@@ -28,6 +28,7 @@ JWT_REFRESH_SECRET = os.environ["JWT_REFRESH_SECRET"]
 enkriptor = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login", scheme_name="JWT")
+# oauth2_user = OAuth2PasswordBearer(tokenUrl="users/", scheme_name="JWT")
 
 
 def hashing(password: str):
