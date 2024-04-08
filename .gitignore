@@ -1,8 +1,5 @@
-### Git ###
-# .gitignore
-
-### Docker ###
-docker/
+### Folder ###
+files/
 
 ### VisualStudioCode ###
 .vscode/*

@@ -85,7 +85,7 @@ Tidak lama akan muncul `INFO:     Application startup complete.` sebagai tanda *
 
 ### Testing
 
-Untuk melakukan pengetesan pada backend, jalankan web browser dan buka alamat `localhost:8000/docs`
+Untuk melakukan pengetesan pada backend, jalankan web browser dan buka alamat `localhost:8000/docs` kemudian dapat dilihat pada video di bawah ini.
 
 ### Troubleshooting
 
@@ -108,4 +108,5 @@ Untuk melakukan pengetesan pada backend, jalankan web browser dan buka alamat `l
 
 ## Catatan
 
-- Masih belum bisa mengirim _email_ verifikasi
+- Masih belum bisa mengirim _email_ verifikasi ke alamat _email user_
+- Tidak ada _error_ saat mengunggah _file_ atau pun memuat _file_, tetapi _file_ yang diunggah tidak dapat ditampilkan

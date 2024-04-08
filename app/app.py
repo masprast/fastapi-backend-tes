@@ -1,17 +1,21 @@
 from dotenv import load_dotenv
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 
 from app.db.initdb import InitDB
-from app.router import authRouter, userRouter
+from app.router import authRouter, uploadRouter, userRouter
 
 load_dotenv("local.env")
 
 app = FastAPI()
 app.include_router(authRouter.router)
 app.include_router(userRouter.router)
+app.include_router(uploadRouter.router)
 
 InitDB()
 # db_dependency = Annotated(Session,Depends(get_db))
+app.mount("/files", StaticFiles(directory="files"), "files")
 
 
 @app.get("/")
