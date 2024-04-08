@@ -1,20 +1,52 @@
+import json
 from typing import Annotated, List
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 
+from app.base.tokenBase import TokenData
 from app.base.userbase import UserBase, UserInDB
 from app.model.userModel import UserModel
 from app.service import userService
 from app.db.db import get_db
+from app.service import authService
+from app.service.authService import JWTdecode, oauth2_scheme
 
 router = APIRouter(prefix="/users", tags=["User"])
 
 
-@router.get("/", response_model=List[UserBase])
-async def getAllUser(db: Session = Depends(get_db)):
-    users = await userService.getAllUser(db)
-    return users
+async def cek_super(token: str, db=Session):
+    tokendata = json.loads(JWTdecode(token).sub)
+    user = await userService.getDetilUser(TokenData(**tokendata), db)
+    if user.is_super:
+        return True
+
+    return False
+
+
+@router.get("/", summary="hanya super user yang dapat melakukan CRUD operation")
+async def getAllUser(
+    token: Annotated[str, Depends(oauth2_scheme)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    tokendata = TokenData(**json.loads(authService.JWTdecode(token).sub))
+    users = userService.getAllUser(db)
+    listUser = List[UserBase]
+    for u in users:
+        listUser.append(
+            UserBase(
+                username=u.username,
+                email=u.email,
+                is_super=u.is_super,
+                last_login=u.last_login,
+            )
+        )
+
+    if tokendata.is_super:
+        return users
+    else:
+        return listUser
 
 
 @router.post(
@@ -22,10 +54,10 @@ async def getAllUser(db: Session = Depends(get_db)):
 )
 async def tambahUser(
     user: UserInDB,
-    # token: Annotated[str, Depends(oauth2_scheme)],
+    token: Annotated[str, Depends(oauth2_scheme)],
     db: Session = Depends(get_db),
 ):
-    ada = await userService.getUserByEmail(user.email, db)
+    ada = userService.getUserByEmail(user.email, db)
     if ada:
         pesan = ""
         if ada.username == user.username and ada.email == user.email:
@@ -48,8 +80,8 @@ async def tambahUser(
 
 
 @router.get("/{id}", status_code=status.HTTP_200_OK, response_model=UserBase)
-async def detilUser(id: UUID, db: Session = Depends(get_db)):
-    detil = await userService.getDetilUser(id, db)
+async def detilUser(id: str, db: Session = Depends(get_db)):
+    detil = userService.getDetilUser(UUID(id), db)
     if detil is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -60,11 +92,11 @@ async def detilUser(id: UUID, db: Session = Depends(get_db)):
 
 @router.delete("/hapus/{id}", status_code=status.HTTP_204_NO_CONTENT)
 async def hapusUser(
-    id: int,
-    # token: Annotated[str, Depends(oauth2_scheme)],
+    id: str,
+    token: Annotated[str, Depends(oauth2_scheme)],
     db: Session = Depends(get_db),
 ):
-    hapus = db.query(UserModel).filter(UserModel.id == id)
+    hapus = userService.getDetilUser(id, db)
     if hapus.first() is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -77,11 +109,11 @@ async def hapusUser(
 @router.patch("/ubah/{id}", status_code=status.HTTP_200_OK, response_model=UserBase)
 async def ubahUser(
     data: UserBase,
-    id: int,
-    # token: Annotated[str, Depends(oauth2_scheme)],
+    id: str,
+    token: Annotated[str, Depends(oauth2_scheme)],
     db: Session = Depends(get_db),
 ):
-    ada = db.query(UserModel).filter(UserModel.id == id)
+    ada = userService.getDetilUser(id, db)
     if ada.first() is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -90,6 +122,7 @@ async def ubahUser(
 
     data_dump = data.model_dump(exclude_unset=True)
     model = UserModel(data_dump)
+    print(model)
     model.password = data_dump.get("hashed")
-    perubahan = await userService.patchUser(model, id, db)
+    perubahan = await userService.patchUser(data_dump, id, db)
     return perubahan

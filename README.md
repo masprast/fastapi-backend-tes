@@ -25,7 +25,8 @@ Selanjutnya silahkan kloning repo ini ke dalam sebuah folder.
 1. buat folder untuk menampung repo. ( **_updated_** )
 
    ```sh
-   mkdir fastapi_backend_tes && cd $_
+   mkdir fastapi_backend_tes
+   cd fastapi_backend_tes
    ```
 
    > penulis menggunakan sistem operasi Linux, untuk sistem operasi lain, silahkan menyesuaikan
@@ -104,3 +105,7 @@ Untuk melakukan pengetesan pada backend, jalankan web browser dan buka alamat `l
   > ```
 
 - Hal ini disebabkan adanya _conflict_ antara **passlib** dengan **bcrypt** versi terbaru
+
+## Catatan
+
+- Masih belum bisa mengirim _email_ verifikasi

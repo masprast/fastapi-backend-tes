@@ -1,13 +1,22 @@
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+import json
 import os
 from datetime import datetime, timedelta, timezone
+import smtplib
+import ssl
+from typing import Any
+from uuid import UUID
 from dotenv import load_dotenv
-from email_validator import validate_email, EmailNotValidError
 from fastapi import HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
 from passlib.context import CryptContext
 from jose import JWTError, jwt
-from pydantic import ValidationError
 
-from app.base.tokenBase import TokenPayload
+from app.base.tokenBase import Token, TokenData, TokenPayload
+from app.base.userbase import UserBase, UserInDB
+from app.model.userModel import UserModel
+from app.service import tokenService, userService
 
 load_dotenv("secret.env")
 
@@ -19,6 +28,8 @@ JWT_REFRESH_SECRET = os.environ["JWT_REFRESH_SECRET"]
 
 enkriptor = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login", scheme_name="JWT")
+
 
 def hashing(password: str):
     return enkriptor.hash(password)
@@ -28,59 +39,177 @@ def verifying(password: str, hashed: str):
     return enkriptor.verify(password, hashed)
 
 
+# def userAuthentication(password: str, user: UserModel):
+#     if not verifying(password, user.password):
+#         return False
+#     return True
+def authenticateUser(username: str, password: str, sesion):
+    adaUser = userService.getUserByUsername(username, sesion)
+    if adaUser:
+        isVerified = verifying(password, adaUser.password)
+
+    if not adaUser or not isVerified:
+        return False
+
+    return adaUser
+
+
+def signJWT(payload: TokenPayload):
+    token = jwt.encode(payload, JWT_SECRET, ALGORITHM)
+    return token
+
+
+def JWTdecode(token: str):
+    try:
+        payload = jwt.decode(token, JWT_SECRET, [ALGORITHM])
+        return TokenPayload(**payload).model_dump()
+    except JWTError:
+        # raise HTTPException(
+        #     status_code=status.HTTP_401_UNAUTHORIZED, detail="token tidak valid"
+        # )
+        return dict()
+
+
 def createAccessToken(data: dict, exp: timedelta | None = None):
-    to_encode = data.copy()
-    # print(to_encode)
     if exp:
         exp = datetime.now(timezone.utc) + exp
     else:
         exp = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXP_MIN)
 
     # to_encode.update({"exp": datetime(exp).strftime("%Y-%m-%d %H:%M:%S")})
-    to_encode.update({"exp": exp})
-    return jwt.encode(to_encode, JWT_SECRET, algorithm=ALGORITHM)
+    sekarang = datetime.fromisoformat(str(exp)).timestamp()
+    to_encode = TokenPayload(sub=json.dumps(data), exp=int(sekarang)).model_dump()
+    token = signJWT(to_encode)
+    return token
 
 
 def createRefreshToken(data: dict, exp: timedelta | None = None):
-    to_encode = data.copy()
     if exp:
         exp = datetime.now(timezone.utc) + exp
     else:
         exp = datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXP_DAY)
 
-    to_encode.update({"exp": exp})
-    return jwt.encode(data, JWT_REFRESH_SECRET, algorithm=ALGORITHM)
+    sekarang = datetime.fromisoformat(str(exp)).timestamp()
+    to_encode = TokenPayload(
+        sub=json.dumps(data.copy()), exp=int(sekarang)
+    ).model_dump()
+    token = signJWT(to_encode)
+    return token
 
 
 def verifyToken(token: str):
     try:
-        payload = jwt.decode(token, JWT_SECRET, algorithms=[ALGORITHM])
-        # data = payload.get("sub")
-        data = TokenPayload(**payload)
-        print("data: ", data)
-        if datetime.fromtimestamp(data.exp) > datetime.now():
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="token expired",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
+        payload = JWTdecode(token)
+        if payload:
+            if datetime.fromtimestamp(payload.get("exp")) < datetime.now():
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="token expired",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
 
-    except (JWTError, ValidationError):
+    except JWTError:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="credential tidak valid",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    return data
+    return payload
 
 
-# def emailValidator(email: str):
-#     try:
-#         validation = validate_email(email, check_deliverability=False)
-#         return validation.email
-#     except EmailNotValidError as e:
-#         raise HTTPException(
-#             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-#             detail=f"email '{email}' tidak valid. {str(e)}",
-#         )
+def getCurrentUser(token: str, sesion):
+    try:
+        payload = JWTdecode(token)
+        data = payload.get("sub")
+        print(token)
+        if data is None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="credential tidak valid",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        tokenData = TokenData(data)
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="credential tidak valid",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    currentUser = userService.getDetilUser(tokenData.id, sesion)
+    if currentUser is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="credential tidak valid",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    return UserBase(
+        username=currentUser.username,
+        full_name=currentUser.full_name,
+        email=currentUser.email,
+        is_super=currentUser.is_super,
+        last_login=currentUser.last_login,
+    )
+
+
+def userAktif(user: UserBase):
+    return user
+
+
+def getUserData(id: UUID, sesion):
+    return userService.getUserData(id, sesion)
+
+
+def updateToken(id: UUID, token: Token, tipe: str, sesion):
+    try:
+        secret = JWT_SECRET if tipe == "access_token" else JWT_REFRESH_SECRET
+        tokenStr = token.model_dump(exclude_unset=True).get(
+            "accessToken" if secret == JWT_SECRET else "refreshToken"
+        )
+        # tokenTerinstall = jwt.decode(tokenStr, secret, [ALGORITHM])
+        # tgl_token = tokenTerinstall.get("exp")
+        tokenService.updateToken(id, tokenStr, sesion)
+    except JWTError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+
+
+def kirimEmail(token: str, email: str):
+    from_email = os.environ["EMAIL"]
+    pass_email = os.environ["PASS"]
+
+    alamat_email_verification = (
+        f"""{os.environ['PENGIRIM']}/konfirmasi-email/{token}/"""
+    )
+    body_email = f"""
+    <html>
+    <body>
+        <h1>Assalamualaikum,</h1>
+        <br/>
+        <p>Email ini dikirim ke {email} untuk verifikasi</p>
+        <p>Berikut adalah link untuk verifikasi email anda:</p>
+        <a href="{alamat_email_verification}">{alamat_email_verification}</a>
+    </body>
+    </html>
+    """
+
+    pesan = MIMEMultipart()
+    pesan["From"] = from_email
+    pesan["To"] = email
+    pesan["Subject"] = "email verificaton"
+    pesan.attach(MIMEText(body_email, "html"))
+
+    try:
+        context = ssl.create_default_context()
+        mailserver = smtplib.SMTP("smtp.gmail.com", 587)
+        mailserver.starttls(context=context)
+        mailserver.login(from_email, pass_email)
+        mailserver.sendmail(from_email, email, pesan.as_string())
+        return {"pesan": "email verifikasi berhasil dikirim"}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"""tidak dapat mengirim email ke {email} | error: {e}""",
+        )
+    finally:
+        mailserver.quit()

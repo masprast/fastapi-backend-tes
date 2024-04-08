@@ -1,15 +1,9 @@
 from datetime import datetime, timezone
-import os
-import smtplib
-import ssl
 from typing import Annotated
-from uuid import UUID
 from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
 
 from app.base.authBase import AuthBase, AuthOutput
 from app.base.tokenBase import Token, TokenData, TokenModelBase
@@ -18,12 +12,14 @@ from app.db.db import get_db
 from app.model.tokenModel import TokenModel
 from app.model.userModel import UserModel
 from app.service import tokenService, userService
+from app.service import authService
 from app.service.authService import (
     createAccessToken,
     createRefreshToken,
     hashing,
-    verifyToken,
+    kirimEmail,
     verifying,
+    oauth2_scheme,
 )
 
 load_dotenv("private.env")
@@ -31,132 +27,116 @@ load_dotenv("private.env")
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login", scheme_name="JWT")
+def getUser(
+    token: Annotated[str, Depends(oauth2_scheme)],
+    sesion: Annotated[Session, Depends(get_db)],
+):
+    print(token)
+    user = authService.getCurrentUser(token, sesion)
+    currentUser = authService.userAktif(user)
+    return currentUser
 
 
 @router.post(
     "/register", status_code=status.HTTP_201_CREATED, response_model=AuthOutput
 )
 async def registerUser(user: AuthBase, session: Annotated[Session, Depends(get_db)]):
-    adaUser = await userService.getUserByEmail(user.email, session)
+    adaUser = userService.getUserByUsername(user.username, session)
     if adaUser:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail="user sudah ada"
         )
 
-    userBaru = AuthBase(password=hashing(user.password), email=user.email)
-    buatUser = await userService.addUser(UserModel(**userBaru.model_dump()), session)
+    userBaru = AuthBase(password=hashing(user.password), username=user.username)
+    buatUser = userService.addUser(UserModel(**userBaru.model_dump()), session)
     # return {
     #     "pesan": f"user {buatUser.username} dengan email {buatUser.email} berhasil registrasi"
     # }
     token = TokenData(
-        email=buatUser.email, id=buatUser.id, is_super=buatUser.is_super
+        username=buatUser.username, id=buatUser.id, is_super=buatUser.is_super
     ).model_dump()
     token.update({"id": str(token.get("id"))})
     access_token = createAccessToken(token)
-    print(buatUser.email)
-    kirimEmail(access_token, buatUser.email)
+
+    # kirimEmail(access_token, buatUser.email)
 
     return AuthOutput(
         id=token.get("id"),
-        email=buatUser.email,
+        username=buatUser.username,
         created_at=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
     )
 
 
-@router.post("/login", response_model=Token)
-async def loginUser(
-    user: Annotated[AuthBase, Depends()], session: Annotated[Session, Depends(get_db)]
+# @router.post("/login", response_model=Token)
+# async def loginUser(
+#     user: Annotated[AuthBase, Depends()], session: Annotated[Session, Depends(get_db)]
+# ):
+#     adauser = userService.getUserByEmail(user.email, session)
+#     if adauser is None:
+#         raise HTTPException(
+#             status_code=status.HTTP_404_NOT_FOUND,
+#             detail=f"tidak ada user dengan email {user.email}",
+#         )
+
+#     if not verifying(user.password, adauser.password):
+#         raise HTTPException(
+#             status_code=status.HTTP_401_UNAUTHORIZED,
+#             detail="tidak memenuhi credential",
+#         )
+
+
+#     dataUser = TokenData(
+#         id=adauser.id, email=adauser.email, is_super=adauser.is_super
+#     ).model_dump()
+#     dataUser.update({"id": str(dataUser.get("id"))})
+#     access_token = createAccessToken(dataUser)
+#     refresh_token = createRefreshToken(dataUser)
+#     # print(
+#     #     "jwt: ",
+#     #     jwt.decode(access_token, authService.JWT_SECRET, [authService.ALGORITHM]),
+#     # )
+#     # userId = authService.getCurrentUserID(access_token)
+#     # gettedUser=userService.getDetilUser(userId)
+#     # gettedUser.last_login = datetime.now()  # .strftime("%Y-%m-%d %H:%M:%S")
+#     updatedUserLastLogin = userService.patchUser(
+#         {"last_login": datetime.now()}, dataUser.get("id"), session
+#     )
+#     tokenModel = TokenModelBase(
+#         userId=updatedUserLastLogin.id,
+#         access_token=access_token,
+#         refresh_token=refresh_token,
+#     )
+#     # tokenModel.update({"userId": str(tokenModel.get("userId"))})
+#     adatoken = tokenService.getToken(tokenModel.userId, session)
+#     # verifiedToken=authService.verifyToken(adatoken.access_token)
+#     if not adatoken:
+#         tokenService.addToken(
+#             TokenModel(**tokenModel.model_dump(exclude_unset=True)), session
+#         )
+#     # return {"access_token": access_token, "refresh_token": refresh_token}
+#     return Token(accessToken=access_token, refreshToken=refresh_token).model_dump()
+@router.post("/login")
+async def login(
+    form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
+    session: Annotated[Session, Depends(get_db)],
 ):
-    adauser = await userService.getUserByEmail(user.email, session)
-    if adauser is None:
+    cekUser = authService.authenticateUser(
+        form_data.username, form_data.password, session
+    )
+    if not cekUser:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"tidak ada user dengan email {user.email}",
+            status_code=status.HTTP_403_FORBIDDEN, detail="invalid credential"
         )
 
-    if not verifying(user.password, adauser.password):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="tidak memenuhi credential",
-        )
-
-    data = TokenData(
-        id=adauser.id, email=adauser.email, is_super=adauser.is_super
+    dataToken = TokenData(
+        id=cekUser.id, username=cekUser.username, is_super=cekUser.is_super
     ).model_dump()
-    data.update({"id": str(data.get("id"))})
-    access_token = createAccessToken(data)
-    refresh_token = createRefreshToken(data)
-    tokenModel = TokenModelBase(
-        userId=adauser.id, access_token=access_token, refresh_token=refresh_token
-    )
-    getteduser = await getUser(access_token, session)
-    getteduser.model_dump()
-    # await tokenService.addToken(
-    #     TokenModel(**tokenModel.model_dump(exclude_unset=True)), session
-    # )
-    # return {"access_token": access_token, "refresh_token": refresh_token}
-    return Token(accessToken=access_token, refreshToken=refresh_token).model_dump()
+    dataToken.update({"id": str(dataToken.get("id"))})
+    accessToken = createAccessToken(dataToken)
+    refreshToken = createRefreshToken(dataToken)
+    return Token(accessToken=accessToken, refreshToken=refreshToken).model_dump()
 
 
-async def getUser(
-    token: Annotated[str, Depends(oauth2_scheme)],
-    session: Session,
-):
-    verified = verifyToken(token).sub
-    print("verified: ", verified)
-    user = await userService.getUserByEmail(verified.get("email"), session)
-    print("user: ", user)
-    if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="tidak ada user",
-        )
-
-    return UserBase(
-        username=user.username,
-        email=user.email,
-        is_super=user.is_super,
-        last_login=user.last_login,
-    )
-
-
-def kirimEmail(token: str, email: str):
-    from_email = os.environ["EMAIL"]
-    pass_email = os.environ["PASS"]
-
-    alamat_email_verification = (
-        f"""{os.environ['PENGIRIM']}/konfirmasi-email/{token}/"""
-    )
-    body_email = f"""
-    <html>
-    <body>
-        <h1>Assalamualaikum,</h1>
-        <br/>
-        <p>Email ini dikirim ke {email} untuk verifikasi</p>
-        <p>Berikut adalah link untuk verifikasi email anda:</p>
-        <a href="{alamat_email_verification}">{alamat_email_verification}</a>
-    </body>
-    </html>
-    """
-
-    pesan = MIMEMultipart()
-    pesan["From"] = from_email
-    pesan["To"] = email
-    pesan["Subject"] = "email verificaton"
-    pesan.attach(MIMEText(body_email, "html"))
-
-    try:
-        context = ssl.create_default_context()
-        mailserver = smtplib.SMTP("smtp.gmail.com", 587)
-        mailserver.starttls(context=context)
-        mailserver.login(from_email, pass_email)
-        mailserver.sendmail(from_email, email, pesan.as_string())
-        return {"pesan": "email verifikasi berhasil dikirim"}
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"""tidak dapat mengirim email ke {email} | error: {e}""",
-        )
-    finally:
-        mailserver.quit()
+@router.get("/me", response_model=UserBase)
+async def aboutMe(me: Annotated[UserBase, Depends(getUser)]):
+    return me
