@@ -85,9 +85,9 @@ async def tambahUser(
     return [userBaru]
 
 
-@router.get("/{id}", status_code=status.HTTP_200_OK, response_model=UserBase)
-async def detilUser(id: str, db: Session = Depends(get_db)):
-    detil = userService.getDetilUser(UUID(id), db)
+@router.get("/{username}", status_code=status.HTTP_200_OK, response_model=UserBase)
+async def detilUser(username: str, db: Session = Depends(get_db)):
+    detil = userService.getUserByUsername(username, db)
     if detil is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
