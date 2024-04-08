@@ -117,15 +117,16 @@ async def registerUser(user: AuthBase, session: Annotated[Session, Depends(get_d
 #     return Token(accessToken=access_token, refreshToken=refresh_token).model_dump()
 @router.post("/login")
 async def login(
-    form_data: Annotated[AuthBase, Depends()],
+    form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
     session: Annotated[Session, Depends(get_db)],
 ):
-    cekUser = authService.authenticateUser(form_data.email, form_data.password, session)
+    cekUser = authService.authenticateUser(
+        form_data.username, form_data.password, session
+    )
     if not cekUser:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="invalid credential"
         )
-
     dataToken = TokenData(
         id=cekUser.id, email=cekUser.email, is_super=cekUser.is_super
     ).model_dump()

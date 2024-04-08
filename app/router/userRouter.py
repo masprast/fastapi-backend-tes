@@ -32,7 +32,7 @@ async def cek_super(token: str, db=Session):
     dependencies=[Depends(JWTBearer())],
 )
 async def getAllUser(
-    # token: Annotated[str, Depends(oauth2_scheme)],
+    token: Annotated[str, Depends(oauth2_scheme)],
     db: Annotated[Session, Depends(get_db)],
 ):
     # data = authService.JWTdecode(token)
@@ -72,7 +72,7 @@ async def tambahUser(
     db: Session = Depends(get_db),
 ):
     # ada = userService.getUserByUsername(user.username, db, db)
-    ada = userService.getDetilUser()
+    ada = userService.getUserByEmail(user.email, db)
     if ada:
         pesan = ""
         if ada.username == user.username and ada.email == user.email:
@@ -98,6 +98,7 @@ async def tambahUser(
     "/{id}",
     status_code=status.HTTP_200_OK,
     response_model=UserBase,
+    dependencies=[Depends(JWTBearer())],
 )
 async def detilUser(id: str, db: Session = Depends(get_db)):
     detil = userService.getDetilUser(UUID(id), db)
@@ -109,7 +110,11 @@ async def detilUser(id: str, db: Session = Depends(get_db)):
     return detil
 
 
-@router.delete("/hapus/{id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/hapus/{id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(JWTBearer())],
+)
 async def hapusUser(
     id: str,
     token: Annotated[str, Depends(oauth2_scheme)],
@@ -125,7 +130,12 @@ async def hapusUser(
     userService.deleteUser(id, db)
 
 
-@router.patch("/ubah/{id}", status_code=status.HTTP_200_OK, response_model=UserBase)
+@router.patch(
+    "/ubah/{id}",
+    status_code=status.HTTP_200_OK,
+    response_model=UserBase,
+    dependencies=[Depends(JWTBearer())],
+)
 async def ubahUser(
     data: UserBase,
     id: str,
